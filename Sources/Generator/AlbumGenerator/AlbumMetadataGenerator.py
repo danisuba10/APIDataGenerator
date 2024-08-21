@@ -15,9 +15,13 @@ class JSONAlbumMetadaGenerator:
 
         self.sp = spotipy.Spotify(client_credentials_manager=SpotifyClientCredentials())
         self.get_guid_api_url = "http://localhost:5231/api/Miscle/GetGUID"
+        self.get_guid_artist_byname = "http://localhost:5231/api/Artist/GetArtistID"
+        self.get_guid_album_byname = "http://localhost:5231/api/Album/GetAlbumID"
         self.artist_image_path = f"C:\\Project Folder\\CSHARP\\Musify-o\\API\\Images\\Artists\\"
         self.album_image_path = f"C:\\Project Folder\\CSHARP\\Musify-o\\API\\Images\\Albums\\"
 
+        self.artist_id_to_guid = {}
+        self.albums_id_to_guid = {}
 
     def get_random_album(self):
         offset = random.randint(0, 1000)
@@ -35,30 +39,47 @@ class JSONAlbumMetadaGenerator:
         album_artists = []
         for artist in album['artists']:
 
-            artist_id = self.get_guid()
+            artist_id = artist['id']
+
+            if artist_id in self.artist_id_to_guid:
+                artist_guid = self.artist_id_to_guid[artist_id]
+            else:
+                artist_guid = self._get_or_create_artist_guid(artist['name'])
+                self.artist_id_to_guid[artist_id] = artist_guid
 
             artist_info = {
-                "guid": artist_id,
+                "guid": artist_guid,
                 "name": artist['name'],
                 "imgLocation": None
             }
 
-            images = artist.get('images', [])
+            artist_details = self.sp.artist(artist['id'])
+            images = artist_details.get('images', [])
+
             if images:
                 artist_image_url = images[0].get('url')
             else:
                 artist_image_url = None
+                print("No image!")
 
             if artist_image_url:
-                self._download_image(artist_image_url, os.path.join(self.artist_image_path, f"{artist_id}.jpg"))
+                self._download_image(artist_image_url, os.path.join(self.artist_image_path, f"{artist_guid}.jpg"))
 
             album_artists.append(artist_info)
         album_songs = self._get_album_songs(album['id'])
 
-        album_id = self.get_guid()
+        #album_id = self.get_guid()
+
+        album_id = album['id']
+
+        if album_id in self.albums_id_to_guid:
+            album_guid = self.albums_id_to_guid[album_id]
+        else:
+            album_guid = self._get_or_create_album_guid(album['name'])
+            self.albums_id_to_guid[album_id] = album_guid
 
         album_json = {
-            "guid": album_id,
+            "guid": album_guid,
             "name": album['name'],
             "imageLocation": None,
             "songs": album_songs,
@@ -70,9 +91,10 @@ class JSONAlbumMetadaGenerator:
             album_image_url = images[0].get('url')
         else:
             album_image_url = None
+            print("No image!")
 
         if album_image_url:
-            self._download_image(album_image_url, os.path.join(self.album_image_path, f"{album_id}.jpg"))
+            self._download_image(album_image_url, os.path.join(self.album_image_path, f"{album_guid}.jpg"))
 
         return album_json
     
@@ -118,7 +140,7 @@ class JSONAlbumMetadaGenerator:
         if response.status_code == 200:
             id = response.text.strip().replace('"', '')
         else:
-            id = uuid.uuid4()
+            id = str(uuid.uuid4())
 
         return id
 
@@ -133,3 +155,28 @@ class JSONAlbumMetadaGenerator:
                 print(f"Failed to download image from URL")
         except Exception as e:
             print(f"An error occured while downloading image {e}")
+
+    def _get_or_create_artist_guid(self, artist_name):
+        try:
+            response = requests.get(f"{self.get_guid_artist_byname}?name={requests.utils.quote(artist_name)}", verify=False)
+            if response.status_code == 200:
+                artist_guid = response.text.strip().replace('"', '')
+            else:
+                artist_guid = self.get_guid()
+        except requests.RequestException as e:
+            print(f"An error occurred during the API call: {e}")
+            artist_guid = self.get_guid()
+
+        return artist_guid
+    
+    def _get_or_create_album_guid(self, album_name):
+        try:
+            response = requests.get(f"{self.get_guid_album_byname}?name={requests.utils.quote(album_name)}", verify=False)
+            if response.status_code == 200:
+                album_guid = response.text.strip().replace('"', '')
+            else:
+                album_guid = self.get_guid()
+        except requests.RequestException as e:
+            print(f"An error occurred during the API call: {e}")
+        
+        return album_guid
