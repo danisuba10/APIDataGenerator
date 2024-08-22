@@ -45,29 +45,30 @@ class JSONAlbumMetadaGenerator:
                 artist_guid = self._get_or_create_artist_guid(artist['name'])
                 self.artist_id_to_guid[artist_id] = artist_guid
 
+                artist_details = self.sp.artist(artist['id'])
+                images = artist_details.get('images', [])
+
+                if images:
+                    artist_image_url = images[0].get('url')
+                else:
+                    artist_image_url = None
+                    print(f"No image found for artist: {artist['name']} (ID: {artist_id})")
+
+                if artist_image_url:
+                    image_path = os.path.join(self.artist_image_path, f"{artist_guid}.jpg")
+                    if not os.path.exists(image_path):
+                        success = self._download_image(artist_image_url, image_path)
+                        if not success:
+                            print(f"Failed to download image for artist: {artist['name']} (ID: {artist_id})")
+                    else:
+                        print(f"Image already exists for artist: {artist['name']} (GUID: {artist_guid})")
+
             artist_info = {
                 "guid": artist_guid,
                 "name": artist['name'],
                 "imgLocation": None
             }
 
-            artist_details = self.sp.artist(artist['id'])
-            images = artist_details.get('images', [])
-
-            if images:
-                artist_image_url = images[0].get('url')
-            else:
-                artist_image_url = None
-                print(f"No image found for artist: {artist['name']} (ID: {artist_id})")
-
-            if artist_image_url:
-                image_path = os.path.join(self.artist_image_path, f"{artist_guid}.jpg")
-                if not os.path.exists(image_path):
-                    success = self._download_image(artist_image_url, image_path)
-                    if not success:
-                        print(f"Failed to download image for artist: {artist['name']} (ID: {artist_id})")
-                else:
-                    print(f"Image already exists for artist: {artist['name']} (GUID: {artist_guid})")
             album_artists.append(artist_info)
         
         album_songs = self._get_album_songs(album['id'])
@@ -114,29 +115,29 @@ class JSONAlbumMetadaGenerator:
                     artist_guid = self._get_or_create_artist_guid(artist['name'])
                     self.artist_id_to_guid[artist_id] = artist_guid
 
+                    artist_details = self.sp.artist(artist['id'])
+                    images = artist_details.get('images', [])
+
+                    if images:
+                        artist_image_url = images[0].get('url')
+                    else:
+                        artist_image_url = None
+                        print(f"No image found for artist: {artist['name']} (ID: {artist_id})")
+
+                    if artist_image_url:
+                        image_path = os.path.join(self.artist_image_path, f"{artist_guid}.jpg")
+                        if not os.path.exists(image_path):
+                            success = self._download_image(artist_image_url, image_path)
+                            if not success:
+                                print(f"Failed to download image for artist: {artist['name']} (ID: {artist_id})")
+                        else:
+                            print(f"Image already exists for artist: {artist['name']} (GUID: {artist_guid})")
+
                 artist_info = {
                 "guid": artist_guid,
                 "name": artist['name'],
                 "imgLocation": None
                 }
-
-                artist_details = self.sp.artist(artist['id'])
-                images = artist_details.get('images', [])
-
-                if images:
-                    artist_image_url = images[0].get('url')
-                else:
-                    artist_image_url = None
-                    print(f"No image found for artist: {artist['name']} (ID: {artist_id})")
-
-                if artist_image_url:
-                    image_path = os.path.join(self.artist_image_path, f"{artist_guid}.jpg")
-                    if not os.path.exists(image_path):
-                        success = self._download_image(artist_image_url, image_path)
-                        if not success:
-                            print(f"Failed to download image for artist: {artist['name']} (ID: {artist_id})")
-                    else:
-                        print(f"Image already exists for artist: {artist['name']} (GUID: {artist_guid})")
 
             song_artists.append(artist_info)
 
