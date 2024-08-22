@@ -38,9 +38,7 @@ class JSONAlbumMetadaGenerator:
     def _generate_album_json(self, album):
         album_artists = []
         for artist in album['artists']:
-
             artist_id = artist['id']
-
             if artist_id in self.artist_id_to_guid:
                 artist_guid = self.artist_id_to_guid[artist_id]
             else:
@@ -60,18 +58,21 @@ class JSONAlbumMetadaGenerator:
                 artist_image_url = images[0].get('url')
             else:
                 artist_image_url = None
-                print("No image!")
+                print(f"No image found for artist: {artist['name']} (ID: {artist_id})")
 
             if artist_image_url:
-                self._download_image(artist_image_url, os.path.join(self.artist_image_path, f"{artist_guid}.jpg"))
-
+                image_path = os.path.join(self.artist_image_path, f"{artist_guid}.jpg")
+                if not os.path.exists(image_path):
+                    success = self._download_image(artist_image_url, image_path)
+                    if not success:
+                        print(f"Failed to download image for artist: {artist['name']} (ID: {artist_id})")
+                else:
+                    print(f"Image already exists for artist: {artist['name']} (GUID: {artist_guid})")
             album_artists.append(artist_info)
+        
         album_songs = self._get_album_songs(album['id'])
 
-        #album_id = self.get_guid()
-
         album_id = album['id']
-
         if album_id in self.albums_id_to_guid:
             album_guid = self.albums_id_to_guid[album_id]
         else:
@@ -91,7 +92,7 @@ class JSONAlbumMetadaGenerator:
             album_image_url = images[0].get('url')
         else:
             album_image_url = None
-            print("No image!")
+            print(f"No image found for album: {album['name']} (ID: {album_id})")
 
         if album_image_url:
             self._download_image(album_image_url, os.path.join(self.album_image_path, f"{album_guid}.jpg"))
@@ -105,11 +106,38 @@ class JSONAlbumMetadaGenerator:
             song_artists = []
             
             for artist in song['artists']:
+
+                artist_id = artist['id']
+                if artist_id in self.artist_id_to_guid:
+                    artist_guid = self.artist_id_to_guid[artist_id]
+                else:
+                    artist_guid = self._get_or_create_artist_guid(artist['name'])
+                    self.artist_id_to_guid[artist_id] = artist_guid
+
                 artist_info = {
-                "guid": None,
+                "guid": artist_guid,
                 "name": artist['name'],
                 "imgLocation": None
                 }
+
+                artist_details = self.sp.artist(artist['id'])
+                images = artist_details.get('images', [])
+
+                if images:
+                    artist_image_url = images[0].get('url')
+                else:
+                    artist_image_url = None
+                    print(f"No image found for artist: {artist['name']} (ID: {artist_id})")
+
+                if artist_image_url:
+                    image_path = os.path.join(self.artist_image_path, f"{artist_guid}.jpg")
+                    if not os.path.exists(image_path):
+                        success = self._download_image(artist_image_url, image_path)
+                        if not success:
+                            print(f"Failed to download image for artist: {artist['name']} (ID: {artist_id})")
+                    else:
+                        print(f"Image already exists for artist: {artist['name']} (GUID: {artist_guid})")
+
             song_artists.append(artist_info)
 
             song = {
@@ -151,10 +179,13 @@ class JSONAlbumMetadaGenerator:
                 with open(file_path, 'wb') as file:
                     for chunk in response.iter_content(1024):
                         file.write(chunk)
+                return True
             else:
-                print(f"Failed to download image from URL")
+                print(f"Failed to download image from {url} (Status code: {response.status_code})")
+                return False
         except Exception as e:
-            print(f"An error occured while downloading image {e}")
+            print(f"An error occurred while downloading image from {url}: {e}")
+            return False
 
     def _get_or_create_artist_guid(self, artist_name):
         try:
