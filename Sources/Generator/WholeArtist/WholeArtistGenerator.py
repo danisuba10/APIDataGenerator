@@ -68,7 +68,7 @@ class WholeArtistGenerator:
 
     def get_random_artist(self):
         try:
-            results = self.sp.search(q="", type="artist", limit=1, offset=0)
+            results = self.sp.search(q="are", type="artist", limit=1, offset=0)
             artists = results["artists"]["items"]
             return artists[0] if artists else None
         except Exception as e:
@@ -189,9 +189,11 @@ class WholeArtistGenerator:
             logging.error(f"Failed to add album {album_name} to API: {e}")
             return None
 
-    def add_song_to_api(self, title, duration, album_id, position, artist_ids):
+    def add_song_to_api(self, title, duration, album_id, position, artist_ids, file_path=None):
         try:
             url = f"{self.api_url}/song/add-song"
+            headers = {"Authorization": f"Bearer {self.jwt_token}"}
+
             data = {
                 "Title": title,
                 "Duration": duration,
@@ -199,13 +201,26 @@ class WholeArtistGenerator:
                 "PositionInAlbum": position,
                 "ArtistIds": artist_ids,
             }
-            headers = {"Authorization": f"Bearer {self.jwt_token}"}
-            response = requests.post(url, data=data, headers=headers)
+
+            if file_path and os.path.exists(file_path):
+                with open(file_path, "rb") as f:
+                    files = {
+                        "SoundFile": (os.path.basename(file_path), f, "audio/mpeg")
+                    }
+                    response = requests.post(url, data=data, files=files, headers=headers)
+            else:
+                response = requests.post(url, data=data, headers=headers)
+
             response.raise_for_status()
+
             return True
         except Exception as e:
             logging.error(f"Failed to add song {title} to API: {e}")
             return False
+        finally:
+            if file_path and os.path.exists(file_path):
+                os.remove(file_path)
+                logging.info(f"Deleted file: {file_path}")
 
     def check_artist_exists(self, artist_name):
         try:
@@ -354,20 +369,20 @@ class WholeArtistGenerator:
                         if collab_id in self.processed_artists
                     ]
 
-                    # Download the preview MP3 (if preview URL is available)
-                    # if track_preview_url:
-                    #     sanitized_artist_name = self.sanitize_filename(artist_name)
-                    #     sanitized_album_name = self.sanitize_filename(album_name)
-                    #     folder_path = f"{sanitized_artist_name}/{sanitized_album_name}"
-                    #     os.makedirs(folder_path, exist_ok=True)
-                    #     sanitized_file_title = self.sanitize_filename(track_title)
-                    #     file_path = f"{folder_path}/{sanitized_file_title}.mp3"
-                    #
-                    #     self.download_preview(track_preview_url, file_path)
+                    if track_preview_url:
+                        sanitized_artist_name = self.sanitize_filename(artist_name)
+                        sanitized_album_name = self.sanitize_filename(album_name)
+                        folder_path = f"{sanitized_artist_name}/{sanitized_album_name}"
+                        os.makedirs(folder_path, exist_ok=True)
+                        sanitized_file_title = self.sanitize_filename(track_title)
+                        file_path = f"{folder_path}/{sanitized_file_title}.mp3"
+
+                        self.download_preview(track_preview_url, file_path)
 
                     # Add the song to your API with all artist IDs
                     logging.info(f"Adding song '{track_title}' to your API...")
-                    if not self.add_song_to_api(track_title, track_duration, album_id_in_api, track_position, all_artist_ids):
+                    if not self.add_song_to_api(track_title, track_duration, album_id_in_api, track_position,
+                                                all_artist_ids, file_path):
                         logging.error(f"Failed to add song '{track_title}' to your API.")
 
             logging.info(f"Completed processing artist '{artist_name}'.")
