@@ -1,6 +1,5 @@
 import time
 from Sources.Generator.Generate import Generate
-from Sources.Cleanup.Cleanup import ArtistCleanup
 
 def generate():
     albums_needed = 1
