@@ -1,5 +1,8 @@
 import os
 import re
+import time
+
+import jwt
 import requests
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -43,8 +46,9 @@ class WholeArtistGenerator:
         os.environ['SPOTIPY_REDIRECT_URI'] = SPOTIPY_REDIRECT_URI
 
         self.sp = spotipy.Spotify(client_credentials_manager=SpotifyClientCredentials(), retries=0)
-        self.api_url = "http://localhost:5231/"
+        self.api_url = "http://api.meloptica.stream/"
 
+        self.token_expiration_time = None
         self.jwt_token = self.login_to_local_api()
         self.processed_artists = {}  # Track processed artists to avoid duplicates
 
@@ -61,10 +65,27 @@ class WholeArtistGenerator:
             }
             response = requests.post(url, data=login_data)
             response.raise_for_status()  # Raise an exception for HTTP errors
+
+            token = response.text
+
+            self.jwt_token = token
+            decoded_token = jwt.decode(token, options={"verify_signature": False})
+            self.token_expiration_time = decoded_token.get("exp")
+
+            logging.info("Logged in successfully. Token expiration: "
+                         f"{self.token_expiration_time} (UNIX timestamp)")
+
             return response.text
         except requests.exceptions.RequestException as e:
             logging.error(f"Failed to login to local API: {e}")
             raise
+
+    def is_token_expired(self):
+        if not self.jwt_token or not self.token_expiration_time:
+            return True  # No token or expiration time means it's expired
+
+        current_time = time.time()
+        return current_time >= self.token_expiration_time
 
     def get_random_artist(self):
         try:
@@ -113,6 +134,10 @@ class WholeArtistGenerator:
 
     def add_artist_to_api(self, artist_name, image_url):
         try:
+            if self.is_token_expired():
+                logging.info("Token has expired. Logging in again...")
+                self.login_to_local_api()
+
             url = f"{self.api_url}/artist/add-artist"
             sanitized_artist_name = self.sanitize_filename(artist_name)
             image_path = f"{sanitized_artist_name}.jpg"
@@ -150,6 +175,10 @@ class WholeArtistGenerator:
 
     def add_album_to_api(self, album_name, year, image_url, artist_ids):
         try:
+            if self.is_token_expired():
+                logging.info("Token has expired. Logging in again...")
+                self.login_to_local_api()
+
             url = f"{self.api_url}/album/add-album"
             sanitized_album_name = self.sanitize_filename(album_name)
             image_path = f"{sanitized_album_name}.jpg"
@@ -191,6 +220,10 @@ class WholeArtistGenerator:
 
     def add_song_to_api(self, title, duration, album_id, position, artist_ids, file_path=None):
         try:
+            if self.is_token_expired():
+                logging.info("Token has expired. Logging in again...")
+                self.login_to_local_api()
+
             url = f"{self.api_url}/song/add-song"
             headers = {"Authorization": f"Bearer {self.jwt_token}"}
 
