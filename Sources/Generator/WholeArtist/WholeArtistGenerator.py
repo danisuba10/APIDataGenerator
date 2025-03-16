@@ -40,13 +40,16 @@ logging.basicConfig(
 )
 
 class WholeArtistGenerator:
-    def __init__(self):
+    def __init__(self, artist_name, album_types):
         os.environ['SPOTIPY_CLIENT_ID'] = SPOTIPY_CLIENT_ID
         os.environ['SPOTIPY_CLIENT_SECRET'] = SPOTIPY_CLIENT_SECRET
         os.environ['SPOTIPY_REDIRECT_URI'] = SPOTIPY_REDIRECT_URI
 
+        self.artist_name = artist_name
+        self.album_types = album_types
+
         self.sp = spotipy.Spotify(client_credentials_manager=SpotifyClientCredentials(), retries=0)
-        self.api_url = "http://api.meloptica.stream/"
+        self.api_url = "http://localhost:5231/"
 
         self.token_expiration_time = None
         self.jwt_token = self.login_to_local_api()
@@ -89,7 +92,7 @@ class WholeArtistGenerator:
 
     def get_random_artist(self):
         try:
-            results = self.sp.search(q="are", type="artist", limit=1, offset=0)
+            results = self.sp.search(q=self.artist_name, type="artist", limit=1, offset=0)
             artists = results["artists"]["items"]
             return artists[0] if artists else None
         except Exception as e:
@@ -99,7 +102,7 @@ class WholeArtistGenerator:
     def get_artist_albums(self, artist_id):
         try:
             albums = []
-            results = self.sp.artist_albums(artist_id, album_type="album", limit=50)
+            results = self.sp.artist_albums(artist_id, album_type=self.album_types, limit=75)
             albums.extend(results["items"])
             while results["next"]:
                 results = self.sp.next(results)
