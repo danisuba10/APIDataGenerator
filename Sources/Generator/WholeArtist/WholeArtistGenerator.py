@@ -102,6 +102,7 @@ class WholeArtistGenerator:
     def get_artist_albums(self, artist_id):
         try:
             albums = []
+            print("Album types: ", self.album_types);
             results = self.sp.artist_albums(artist_id, album_type=self.album_types, limit=75)
             albums.extend(results["items"])
             while results["next"]:
